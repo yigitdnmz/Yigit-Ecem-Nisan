@@ -70,9 +70,10 @@
   <script type="module">
     // =============== AYARLAR ===============
     const EVENT_ID = new URLSearchParams(location.search).get('event') || 'nisan-2025-11-xx';
-    const SUPABASE_URL = 'https://pktmcxuefewetptyavzi.supabase.co'; // Project Settings → API → Project URL
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrdG1jeHVlZmV3ZXRwdHlhdnppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3MzUxNDQsImV4cCI6MjA3NzMxMTE0NH0._rLeZhk7_VLiJxj7LeRkaLhTwuBF0J5qUSAv9Ur5Q4U'; // Project Settings → API → anon public
+    const SUPABASE_URL = 'https://YOUR-PROJECT-REF.supabase.co'; // Project Settings → API → Project URL
+    const SUPABASE_ANON_KEY = 'YOUR-ANON-KEY'; // Project Settings → API → anon public
     const BUCKET = 'engagement-uploads'; // private bucket adı
+const UPLOADS_TABLE = 'uploads'; // dosya kayıt tablosu (aşağıdaki SQL ile oluştur)
 
     // =============== SDK IMPORT ===============
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -144,7 +145,7 @@
       try{
         // 1) Dosya boyutu ve tip kontrolü (10MB)
         for(const f of selectedFiles){
-          if(f.size > 10 * 1024 * 1024) throw new Error('Dosya boyutu 10MB sınırını aşıyor: ' + f.name);
+          if(f.size > 200 * 1024 * 1024) throw new Error('Dosya boyutu 10MB sınırını aşıyor: ' + f.name);
           if(!(f.type.startsWith('image/') || f.type.startsWith('video/'))) throw new Error('Yalnızca görüntü veya video yükleyin.');
         }
 
@@ -163,6 +164,19 @@
             .from(BUCKET)
             .upload(path, file, { contentType: file.type, upsert: false });
           if(error) throw error;
+
+          // --- Dosya kaydını veritabanına da yaz (kimden geldi takibi) ---
+          const { error: insErr } = await supabase
+            .from(UPLOADS_TABLE)
+            .insert({
+              path,
+              event: EVENT_ID,
+              name: (guestNameEl.value || '').slice(0,50) || null,
+              mime_type: file.type,
+              size_bytes: file.size,
+              user_agent: navigator.userAgent
+            });
+          if(insErr) console.warn('uploads insert warning:', insErr);
 
           completed += 1;
           uploadPaths.push(path);
