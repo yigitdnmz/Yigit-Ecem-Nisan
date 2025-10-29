@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>📸 Nişan Albümü & Mesaj Kutusu (Supabase)</title>
+  <meta name="description" content="Nişanımız için fotoğraf yükleme ve mesaj bırakma sayfası — Supabase ile" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body{font-family:Inter,system-ui,Arial,Helvetica,sans-serif}
+    .glass{backdrop-filter: blur(10px); background:rgba(255,255,255,.85)}
+    .fade-in{animation:fade .4s ease both}
+    @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-rose-50 via-rose-100 to-rose-200">
+  <main class="max-w-2xl mx-auto p-4 sm:p-6">
+    <section class="glass rounded-2xl shadow-xl p-6 sm:p-8 fade-in">
+      <header class="text-center mb-6">
+        <h1 class="text-2xl sm:text-3xl font-extrabold">🎉 Hoş geldiniz!</h1>
+        <p class="text-sm sm:text-base text-gray-700 mt-2">Nişanımıza anı bırakın: Fotoğraflarınızı yükleyin, bize kısa bir mesaj yazın. 💍</p>
+      </header>
+
+      <!-- Mesaj Formu -->
+      <form id="messageForm" class="space-y-3">
+        <div>
+          <label class="block text-sm font-semibold mb-1" for="guestName">Adınız (opsiyonel)</label>
+          <input id="guestName" name="guestName" class="w-full rounded-xl border border-gray-300 p-3 focus:outline-none focus:ring-2 focus:ring-rose-400" placeholder="Örn. Ayşe & Ali arkadaşınız" />
+        </div>
+        <div>
+          <label class="block text-sm font-semibold mb-1" for="guestMessage">Bize bir mesaj bırakın ✍️</label>
+          <textarea id="guestMessage" name="guestMessage" rows="3" maxlength="1000" class="w-full rounded-xl border border-gray-300 p-3 focus:outline-none focus:ring-2 focus:ring-rose-400" placeholder="Bugünün en güzel anılarınıza eşlik etmek harika! 💞"></textarea>
+          <p class="text-xs text-gray-500 mt-1"><span id="charCount">0</span>/1000</p>
+        </div>
+      </form>
+
+      <!-- Fotoğraf Yükleme -->
+      <section class="mt-6">
+        <h2 class="text-lg font-bold">Fotoğraflarınızı ekleyin</h2>
+        <p class="text-sm text-gray-600">Telefon kamerası ile çekebilir veya galeriden seçebilirsiniz. Maks. 10MB, sadece görüntü/video.</p>
+
+        <div id="dropZone" class="mt-3 border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer hover:bg-white/60">
+          <input id="fileInput" type="file" accept="image/*,video/*" multiple capture="environment" class="hidden" />
+          <p class="text-gray-700">Dosyaları sürükleyip bırakın veya <span class="underline font-semibold">seçmek için dokunun</span>.</p>
+        </div>
+
+        <div id="preview" class="mt-4 grid grid-cols-3 gap-3"></div>
+
+        <div id="progressArea" class="mt-4 hidden">
+          <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+            <div id="progressBar" class="h-3 bg-rose-400" style="width:0%"></div>
+          </div>
+          <p id="progressText" class="text-xs text-gray-600 mt-2">Yükleme hazırlanıyor…</p>
+        </div>
+
+        <button id="submitBtn" class="mt-5 w-full rounded-2xl bg-rose-500 text-white font-semibold py-3 disabled:opacity-60">Gönder</button>
+        <p id="resultMsg" class="mt-3 text-center text-sm"></p>
+      </section>
+
+      <footer class="mt-8 text-center text-xs text-gray-500">
+        <p>Teşekkürler! <span class="align-middle">💗</span></p>
+      </footer>
+    </section>
+  </main>
+
+  <!-- Supabase SDK -->
+  <script type="module">
+    // =============== AYARLAR ===============
+    const EVENT_ID = new URLSearchParams(location.search).get('event') || 'nisan-2025-11-xx';
+    const SUPABASE_URL = 'https://pktmcxuefewetptyavzi.supabase.co'; // Project Settings → API → Project URL
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrdG1jeHVlZmV3ZXRwdHlhdnppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3MzUxNDQsImV4cCI6MjA3NzMxMTE0NH0._rLeZhk7_VLiJxj7LeRkaLhTwuBF0J5qUSAv9Ur5Q4U'; // Project Settings → API → anon public
+    const BUCKET = 'engagement-uploads'; // private bucket adı
+
+    // =============== SDK IMPORT ===============
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // UI Elemanları
+    const guestNameEl = document.getElementById('guestName');
+    const guestMessageEl = document.getElementById('guestMessage');
+    const charCountEl = document.getElementById('charCount');
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const preview = document.getElementById('preview');
+    const submitBtn = document.getElementById('submitBtn');
+    const progressArea = document.getElementById('progressArea');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const resultMsg = document.getElementById('resultMsg');
+
+    // Mesaj karakter sayacı
+    guestMessageEl.addEventListener('input', () => {
+      charCountEl.textContent = guestMessageEl.value.length;
+    });
+
+    // Dropzone davranışı
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('bg-white/80'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('bg-white/80'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault(); dropZone.classList.remove('bg-white/80');
+      if (e.dataTransfer?.files?.length) handleFiles(e.dataTransfer.files);
+    });
+    fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+    let selectedFiles = [];
+    function handleFiles(files){
+      selectedFiles = Array.from(files).slice(0, 20); // makul sınır
+      preview.innerHTML = '';
+      selectedFiles.forEach(file => {
+        const card = document.createElement('div');
+        card.className = 'aspect-square bg-white/70 rounded-xl overflow-hidden flex items-center justify-center text-xs text-gray-600';
+        if(file.type.startsWith('image/')){
+          const img = document.createElement('img');
+          img.className = 'w-full h-full object-cover';
+          img.src = URL.createObjectURL(file);
+          card.appendChild(img);
+        } else if (file.type.startsWith('video/')){
+          const vid = document.createElement('video');
+          vid.className = 'w-full h-full object-cover';
+          vid.src = URL.createObjectURL(file);
+          vid.muted = true; vid.playsInline = true; vid.controls = true;
+          card.appendChild(vid);
+        } else {
+          card.textContent = file.name;
+        }
+        preview.appendChild(card);
+      });
+    }
+
+    submitBtn.addEventListener('click', async ()=>{
+      resultMsg.textContent = '';
+      if(selectedFiles.length === 0 && !guestMessageEl.value.trim()){
+        resultMsg.textContent = 'Lütfen en az bir fotoğraf/video seçin veya bir mesaj yazın.';
+        resultMsg.className = 'mt-3 text-center text-sm text-rose-700';
+        return;
+      }
+
+      submitBtn.disabled = true; progressArea.classList.remove('hidden');
+
+      try{
+        // 1) Dosya boyutu ve tip kontrolü (10MB)
+        for(const f of selectedFiles){
+          if(f.size > 10 * 1024 * 1024) throw new Error('Dosya boyutu 10MB sınırını aşıyor: ' + f.name);
+          if(!(f.type.startsWith('image/') || f.type.startsWith('video/'))) throw new Error('Yalnızca görüntü veya video yükleyin.');
+        }
+
+        // 2) Dosyaları yükle (Supabase Storage, private bucket)
+        let completed = 0;
+        const total = selectedFiles.length;
+        const uploadPaths = [];
+
+        for(const file of selectedFiles){
+          const safeName = file.name.replace(/[^a-zA-Z0-9_.-]/g,'_');
+          const stamp = Date.now() + '_' + Math.random().toString(36).slice(2,8);
+          const path = `${EVENT_ID}/${stamp}_${safeName}`; // bucket içinde klasör
+
+          const { error } = await supabase
+            .storage
+            .from(BUCKET)
+            .upload(path, file, { contentType: file.type, upsert: false });
+          if(error) throw error;
+
+          completed += 1;
+          uploadPaths.push(path);
+          const pctAll = Math.round((completed/Math.max(total,1))*100);
+          progressBar.style.width = pctAll + '%';
+          progressText.textContent = `Yükleniyor… %${pctAll}`;
+        }
+
+        // 3) Mesaj kaydet (messages tablosu)
+        if(guestMessageEl.value.trim()){
+          const { error: insertErr } = await supabase
+            .from('messages')
+            .insert({
+              name: (guestNameEl.value || '').slice(0,50) || null,
+              text: guestMessageEl.value.slice(0,1000),
+              event: EVENT_ID
+            });
+          if(insertErr) throw insertErr;
+        }
+
+        // 4) UI temizle
+        selectedFiles = []; preview.innerHTML = ''; fileInput.value = '';
+        guestMessageEl.value=''; guestNameEl.value=''; charCountEl.textContent='0';
+        progressBar.style.width = '100%'; progressText.textContent = 'Tamamlandı!';
+        resultMsg.textContent = 'Teşekkürler! Gönderiniz bize ulaştı. 🎊';
+        resultMsg.className = 'mt-3 text-center text-sm text-green-700';
+      }catch(err){
+        console.error(err);
+        resultMsg.textContent = 'Üzgünüz, bir sorun oluştu: ' + (err.message || err);
+        resultMsg.className = 'mt-3 text-center text-sm text-rose-700';
+      }finally{
+        submitBtn.disabled = false;
+        setTimeout(()=>{ progressArea.classList.add('hidden'); progressBar.style.width='0%'; }, 1200);
+      }
+    });
+  </script>
+</body>
+</html>
