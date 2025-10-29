@@ -36,40 +36,22 @@
           <button id="adminLoginBtn" class="rounded-lg bg-rose-500 text-white font-semibold p-2">Giriş</button>
         </div>
         <p id="adminLoginMsg" class="text-xs text-rose-700 mt-2"></p>
-        <p class="text-xs text-gray-500 mt-2">İpucu: Varsayılan bilgiler <code>admin</code> / <code>yigitecem</code></p>
+        <p class="text-xs text-gray-500 mt-2">İpucu: <code>admin</code> / <code>yigitecem</code></p>
       </div>
 
-      <!-- Controls -->
-      
-        <div>
-          <label class="text-xs text-gray-500">Başlangıç tarihi</label>
-          <input id="dateFrom" type="date" class="w-full rounded-lg border p-2" />
+      <!-- İçerik -->
+      <div id="content" class="hidden">
+        <div class="mb-6 text-sm text-gray-600">
+          <span id="eventBadge" class="inline-block rounded-lg bg-white/70 px-3 py-1 border">Event: nisan-2025-11-xx</span>
+          <button id="logoutBtn" class="ml-3 rounded-lg border px-3 py-1">Çıkış</button>
         </div>
-        <div>
-          <label class="text-xs text-gray-500">Bitiş tarihi</label>
-          <input id="dateTo" type="date" class="w-full rounded-lg border p-2" />
-        </div>
-        <div class="flex gap-2 items-end">
-          <button id="refreshBtn" class="flex-1 rounded-lg border px-3 py-2">Yenile</button>
-          <button id="logoutBtn" class="rounded-lg border px-3 py-2">Çıkış</button>
-        </div>
-      </div>
 
-      <!-- Tabs -->
-      <div id="tabs" class="hidden mb-4 flex gap-2">
-        <button data-tab="media" class="tab-btn rounded-lg bg-black/80 text-white px-3 py-2 text-sm">Foto/Video</button>
-        <button data-tab="messages" class="tab-btn rounded-lg bg-white text-black px-3 py-2 text-sm">Mesajlar</button>
-      </div>
-
-      <!-- Content Areas -->
-      <div id="tabMedia" class="hidden">
+        <h2 class="text-xl font-bold mb-3">📸 Fotoğraf & 🎞 Video</h2>
         <div id="mediaGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3"></div>
-      </div>
-      <div id="tabMessages" class="hidden">
+
+        <h2 class="text-xl font-bold mt-10 mb-3">💬 Mesajlar</h2>
         <div id="messagesList" class="space-y-3"></div>
       </div>
-
-      
     </section>
   </main>
 
@@ -78,9 +60,13 @@
     const SUPABASE_URL = 'https://pktmcxuefewetptyavzi.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrdG1jeHVlZmV3ZXRwdHlhdnppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3MzUxNDQsImV4cCI6MjA3NzMxMTE0NH0._rLeZhk7_VLiJxj7LeRkaLhTwuBF0J5qUSAv9Ur5Q4U';
     const BUCKET = 'engagement-uploads';
-    const UPLOADS_TABLE = 'uploads';
+    
+    // Event: URL param varsa onu, yoksa default
+    const DEFAULT_EVENT = 'nisan-2025-11-xx';
+    const urlParams = new URLSearchParams(location.search);
+    const EVENT = urlParams.get('event') || DEFAULT_EVENT;
 
-    // Hardcoded admin (UI kilidi – güvenlik için değil, pratik kullanım için)
+    // Hardcoded admin (UI kilidi – güvenlik amaçlı değildir)
     const ADMIN_USER = 'admin';
     const ADMIN_PASS = 'yigitecem';
 
@@ -93,44 +79,24 @@
     const adminLoginMsg = document.getElementById('adminLoginMsg');
     const adminUser = document.getElementById('adminUser');
     const adminPass = document.getElementById('adminPass');
+    const content = document.getElementById('content');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const eventBadge = document.getElementById('eventBadge');
 
-    const controls = document.getElementById('controls');
-    const tabs = document.getElementById('tabs');
-    const tabMedia = document.getElementById('tabMedia');
-    const tabMessages = document.getElementById('tabMessages');
     const mediaGrid = document.getElementById('mediaGrid');
     const messagesList = document.getElementById('messagesList');
 
-    const logoutBtn = document.getElementById('logoutBtn');
-
-    // ====== Helpers ======
-    const urlParams = new URLSearchParams(location.search);
-    function currentEvent(){ return 'nisan-2025-11-xx'; }
-    function fmtMB(bytes){ return bytes ? Math.round(bytes/1024/1024) : 0; }
-
+    // ====== Login ======
     function setAuthed(v){ localStorage.setItem('nisan_admin', v ? '1':'0'); }
     function isAuthed(){ return localStorage.getItem('nisan_admin') === '1'; }
 
-    function showTab(name){
-      if(name==='media'){ tabMedia.classList.remove('hidden'); tabMessages.classList.add('hidden'); }
-      else { tabMessages.classList.remove('hidden'); tabMedia.classList.add('hidden'); }
-      [...document.querySelectorAll('.tab-btn')].forEach(b=>{
-        b.classList.toggle('bg-black/80', b.dataset.tab===name);
-        b.classList.toggle('text-white', b.dataset.tab===name);
-        b.classList.toggle('bg-white', b.dataset.tab!==name);
-        b.classList.toggle('text-black', b.dataset.tab!==name);
-      });
-    }
-
     function unlock(){
       loginBox.classList.add('hidden');
-      controls.classList.remove('hidden');
-      tabs.classList.remove('hidden');
-      showTab('media');
+      content.classList.remove('hidden');
+      eventBadge.textContent = `Event: ${EVENT}`;
       loadAll();
     }
 
-    // ====== Login ======
     if(isAuthed()) unlock();
     adminLoginBtn.addEventListener('click', ()=>{
       if((adminUser.value||'').trim()===ADMIN_USER && (adminPass.value||'').trim()===ADMIN_PASS){
@@ -139,72 +105,73 @@
         adminLoginMsg.textContent = 'Hatalı kullanıcı adı/şifre';
       }
     });
-    logoutBtn.addEventListener('click', ()=>{ setAuthed(false); location.reload(); });
-
-    // Tabs & refresh
-    document.querySelectorAll('[data-tab]')?.forEach(btn=>btn.addEventListener('click', ()=>showTab(btn.dataset.tab)));
-    refreshBtn.addEventListener('click', loadAll);
+    logoutBtn?.addEventListener('click', ()=>{ setAuthed(false); location.reload(); });
 
     // ====== Data Loaders ======
     async function loadAll(){ await Promise.all([loadMedia(), loadMessages()]); }
 
+    // A) MEDYA: Yalnızca STORAGE'tan listele (tabloya ihtiyaç yok)
     async function loadMedia(){
       mediaGrid.innerHTML = '<div class="text-sm text-gray-600">Yükleniyor…</div>';
-      const ev = currentEvent();
-      const qFrom = dateFrom.value ? new Date(dateFrom.value).toISOString() : null;
-      const qTo = dateTo.value ? new Date(new Date(dateTo.value).getTime()+86400000).toISOString() : null;
 
-      let q = supabase.from(UPLOADS_TABLE)
-        .select('id,path,event,name,mime_type,size_bytes,created_at')
-        .eq('event', ev)
-        .order('created_at', { ascending:false })
-        .limit(1000);
-      
-      
+      let offset = 0; const pageSize = 1000; const all = [];
+      while (true) {
+        const { data, error } = await supabase
+          .storage
+          .from(BUCKET)
+          .list(EVENT, { limit: pageSize, offset, sortBy: { column: 'updated_at', order: 'desc' } });
+        if (error) { console.error(error); mediaGrid.innerHTML = '<div class="text-sm text-rose-700">Yüklemeler alınamadı (storage list).</div>'; return; }
+        all.push(...(data||[]));
+        if (!data || data.length < pageSize) break;
+        offset += pageSize;
+      }
 
-      const { data: rows, error } = await q;
-      if(error){ mediaGrid.innerHTML = '<div class="text-sm text-rose-700">Yüklemeler alınamadı.</div>'; console.error(error); return; }
+      if (!all.length){ mediaGrid.innerHTML = '<div class="text-sm text-gray-600">Henüz dosya yok.</div>'; return; }
 
       mediaGrid.innerHTML = '';
-      for(const r of rows){
-        const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrl(r.path, 60*60);
+      for (const obj of all) {
+        const path = `${EVENT}/${obj.name}`;
+        const { data: signed, error: urlErr } = await supabase.storage.from(BUCKET).createSignedUrl(path, 60*60);
+        if (urlErr) { console.error(urlErr); continue; }
         const url = signed?.signedUrl;
-        const kind = (r.mime_type||'').split('/')[0];
+
+        const ext = (obj.name.split('.').pop()||'').toLowerCase();
+        const isVideo = ['mp4','mov','webm','m4v'].includes(ext);
+        const isImage = ['jpg','jpeg','png','gif','webp','heic','heif'].includes(ext);
+
         const card = document.createElement('div');
         card.className = 'rounded-xl overflow-hidden bg-white/80 shadow';
         card.innerHTML = `
           <div class="relative">
-            ${kind==='image' ? `<img src="${url}" class="w-full aspect-square object-cover" alt="media" />` :
-              kind==='video' ? `<video src="${url}" class="w-full aspect-square object-cover" controls playsinline muted></video>` :
-              `<div class='w-full aspect-square grid place-items-center text-xs p-4'>${r.path}</div>`}
+            ${isImage ? `<img src="${url}" class="w-full aspect-square object-cover" alt="media" />` :
+              isVideo ? `<video src="${url}" class="w-full aspect-square object-cover" controls playsinline muted></video>` :
+              `<div class='w-full aspect-square grid place-items-center text-xs p-4'>${obj.name}</div>`}
             <div class="absolute top-2 right-2 flex gap-2">
               <a href="${url}" download class="rounded-lg bg-black/80 text-white text-xs px-2 py-1">İndir</a>
             </div>
           </div>
-          <div class="p-3 text-xs text-gray-700">
-            👤 ${r.name||'-'} · ${r.event} <br/>
-            ${new Date(r.created_at).toLocaleString()} · ${fmtMB(r.size_bytes)} MB
-          </div>`;
+          <div class="p-3 text-xs text-gray-700">${new Date(obj.updated_at || obj.created_at || Date.now()).toLocaleString()}</div>`;
         mediaGrid.appendChild(card);
       }
     }
 
+    // B) MESAJLAR: messages tablosundan çek (RLS yoksa otomatik görünür)
     async function loadMessages(){
       messagesList.innerHTML = '<div class="text-sm text-gray-600">Yükleniyor…</div>';
-      const ev = currentEvent();
-      const qFrom = dateFrom.value ? new Date(dateFrom.value).toISOString() : null;
-      const qTo = dateTo.value ? new Date(new Date(dateTo.value).getTime()+86400000).toISOString() : null;
-
-      let q = supabase.from('messages')
+      const { data: rows, error } = await supabase
+        .from('messages')
         .select('id,name,text,event,created_at')
-        .eq('event', ev)
+        .eq('event', EVENT)
         .order('created_at', { ascending:false })
         .limit(1000);
-      
-      
 
-      const { data: rows, error } = await q;
-      if(error){ messagesList.innerHTML = '<div class="text-sm text-rose-700">Mesajlar alınamadı.</div>'; console.error(error); return; }
+      if(error){
+        console.error(error);
+        messagesList.innerHTML = '<div class="text-sm text-rose-700">Mesajlar alınamadı. (RLS politikalarını kontrol edin.)</div>';
+        return;
+      }
+
+      if(!rows || !rows.length){ messagesList.innerHTML = '<div class="text-sm text-gray-600">Henüz mesaj yok.</div>'; return; }
 
       messagesList.innerHTML = '';
       for(const m of rows){
@@ -217,9 +184,6 @@
         messagesList.appendChild(div);
       }
     }
-
-    // URL'den event varsa input'a yaz
-    eventInput.value = urlParams.get('event') || '';
   </script>
 </body>
 </html>
