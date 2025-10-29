@@ -120,12 +120,12 @@
   <script type="module">
     // =============== AYARLAR ===============
     const EVENT_ID = new URLSearchParams(location.search).get('event') || 'nisan-2025-11-xx';
-    const SUPABASE_URL = 'https://YOUR-https://pktmcxuefewetptyavzi.supabase.co-REF.supabase.co'; // Project Settings → API → Project URL
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrdG1jeHVlZmV3ZXRwdHlhdnppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3MzUxNDQsImV4cCI6MjA3NzMxMTE0NH0._rLeZhk7_VLiJxj7LeRkaLhTwuBF0J5qUSAv9Ur5Q4U'; // Project Settings → API → anon public
+    const SUPABASE_URL = 'https://YOUR-PROJECT-REF.supabase.co'; // Project Settings → API → Project URL
+    const SUPABASE_ANON_KEY = 'YOUR-ANON-KEY'; // Project Settings → API → anon public
 
     // Basit (hardcoded) admin auth — sadece UI kilidi (güvenlik amaçlı değildir)
     const ADMIN_USER = 'admin';
-    const ADMIN_PASS = 'yigitecem';
+    const ADMIN_PASS = 'nisan2025';
 
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -196,7 +196,7 @@
       try{
         // 1) Dosya boyutu ve tip kontrolü (10MB)
         for(const f of selectedFiles){
-          if(f.size > 200 * 1024 * 1024) throw new Error('Dosya boyutu 10MB sınırını aşıyor: ' + f.name);
+          if(f.size > 200 * 1024 * 1024) throw new Error('Dosya boyutu 200MB sınırını aşıyor: ' + f.name);
           if(!(f.type.startsWith('image/') || f.type.startsWith('video/'))) throw new Error('Yalnızca görüntü veya video yükleyin.');
         }
 
